@@ -1,0 +1,24 @@
+"""
+BTC 历史数据回填脚本
+"""
+import asyncio
+import argparse
+
+from data.collectors.okx_collector import OKXCollector
+
+
+async def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--timeframe", default="1h", help="K line timeframe")
+    parser.add_argument("--bars", type=int, default=1000, help="Number of bars")
+    parser.add_argument("--symbol", default="BTC-USDT-SWAP")
+    args = parser.parse_args()
+
+    c = OKXCollector()
+    print(f"Backfilling {args.bars} bars of {args.timeframe} for {args.symbol}...")
+    await c.backfill_klines(args.symbol, args.timeframe, args.bars)
+    print("Done.")
+
+
+if __name__ == "__main__":
+    asyncio.run(main())
