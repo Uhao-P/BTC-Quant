@@ -46,10 +46,10 @@ class MultiFactorSignal:
         ema9, ema21, ema50 = (latest.get(k) for k in ("ema_9", "ema_21", "ema_50"))
         if ema9 is not None and ema21 is not None and ema50 is not None:
             if ema9 > ema21 > ema50 and close[-1] > ema21:
-                score += 3.0
+                score += 3.5
                 reasons.append("Bullish EMA regime")
             elif ema9 < ema21 < ema50 and close[-1] < ema21:
-                score -= 3.0
+                score -= 3.5
                 reasons.append("Bearish EMA regime")
 
         ema21_series = values.get("ema_21")

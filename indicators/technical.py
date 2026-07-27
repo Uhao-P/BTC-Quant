@@ -24,6 +24,10 @@ def rsi(close: np.ndarray, period: int = 14) -> np.ndarray:
 
     rs = avg_gain / np.maximum(avg_loss, 1e-10)
     rsi_val = 100 - (100 / (1 + rs))
+    flat = (avg_gain == 0) & (avg_loss == 0)
+    only_gains = (avg_gain > 0) & (avg_loss == 0)
+    rsi_val[flat] = 50.0
+    rsi_val[only_gains] = 100.0
     return rsi_val
 
 

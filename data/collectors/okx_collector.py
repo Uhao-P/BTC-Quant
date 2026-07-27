@@ -51,16 +51,16 @@ class OKXCollector:
         self, symbol: str = "BTC-USDT-SWAP",
         timeframe: str = "1H",
         limit: int = 300,
-        before: Optional[str] = None,
+        after: Optional[str] = None,
     ) -> list[dict]:
-        """Fetch historical klines. before = bar timestamp in ms."""
+        """Fetch historical klines. ``after`` requests records older than timestamp."""
         params = {
             "instId": symbol,
             "bar": timeframe,
             "limit": min(limit, 300),
         }
-        if before:
-            params["before"] = before
+        if after:
+            params["after"] = after
 
         data = await self._get("/api/v5/market/history-candles", params)
         if data.get("code") != "0":
@@ -85,12 +85,12 @@ class OKXCollector:
     async def backfill_klines(self, symbol: str = "BTC-USDT-SWAP",
                               timeframe: str = "1h", total_bars: int = 1000):
         """回填历史 K 线，每次 300 条向前翻页"""
-        before = None
+        after = None
         collected = 0
         with store.get_session() as session:
             while collected < total_bars:
                 rows = await self.fetch_historical_klines(
-                    symbol, timeframe, limit=300, before=before
+                    symbol, timeframe, limit=min(300, total_bars - collected), after=after
                 )
                 if not rows:
                     break
@@ -98,7 +98,10 @@ class OKXCollector:
                 collected += len(rows)
                 session.commit()
                 print(f"[backfill] {symbol} {timeframe}: +{new} bars (total {collected})")
-                before = str(int(rows[-1]["timestamp"].timestamp() * 1000))
+                next_after = str(int(min(row["timestamp"] for row in rows).timestamp() * 1000))
+                if next_after == after:
+                    break
+                after = next_after
                 await asyncio.sleep(0.2)  # rate limit
 
     # ── Funding rates ──

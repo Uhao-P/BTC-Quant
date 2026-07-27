@@ -46,17 +46,17 @@ class BacktestEngine:
         self,
         df: pd.DataFrame,
         initial_capital: float = 10000.0,
-        maker_fee: float = 0.0002,
         taker_fee: float = 0.0005,
         slippage: float = 0.0002,
         position_fraction: float = 0.25,
+        bars_per_year: int = 8760,
     ):
         self.df = df.reset_index(drop=True)
         self.initial_capital = initial_capital
-        self.maker_fee = maker_fee
         self.taker_fee = taker_fee
         self.slippage = slippage
         self.position_fraction = position_fraction
+        self.bars_per_year = bars_per_year
 
     def run(self, signal_func: Callable[[int, pd.DataFrame], Signal]) -> BacktestResult:
         cash = self.initial_capital
@@ -135,10 +135,10 @@ class BacktestEngine:
             if position is not None and (
                 direction == "close" or direction in ("long", "short") and direction != position["direction"]
             ):
-                close_position(row["close"], i, "signal_close" if direction == "close" else "reverse")
+                close_position(row["open"], i, "signal_close" if direction == "close" else "reverse")
 
             if position is None and direction in ("long", "short"):
-                open_position(direction, row["close"], i, config)
+                open_position(direction, row["open"], i, config)
 
             if position is None:
                 equity_curve.append(cash)
@@ -163,6 +163,6 @@ class BacktestEngine:
         result.max_drawdown = float(np.max(drawdowns)) if len(drawdowns) else 0.0
         returns = np.diff(equity_curve) / np.maximum(np.asarray(equity_curve[:-1]), 1e-12)
         if len(returns) > 1 and np.std(returns) > 0:
-            result.sharpe = float(np.mean(returns) / np.std(returns) * np.sqrt(365))
+            result.sharpe = float(np.mean(returns) / np.std(returns) * np.sqrt(self.bars_per_year))
         result.avg_hold_bars = float(np.mean([t.hold_bars for t in trades])) if trades else 0.0
         return result

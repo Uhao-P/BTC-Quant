@@ -7,14 +7,21 @@ export default function Backtest() {
   const [symbol, setSymbol] = useState('BTC-USDT-SWAP');
   const [result, setResult] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
 
   const runBacktest = async () => {
     setLoading(true);
+    setError(null);
     try {
       const res = await axios.get(`/api/v1/backtest/run?symbol=${encodeURIComponent(symbol)}&limit=1000`);
-      setResult(res.data);
+      if (res.data.error) {
+        setResult(null);
+        setError(`${res.data.error}（需要 ${res.data.need_bars} 根，当前 ${res.data.have} 根）`);
+      } else {
+        setResult(res.data);
+      }
     } catch (e) {
-      console.error(e);
+      setError(e.message);
     } finally {
       setLoading(false);
     }
@@ -84,7 +91,9 @@ export default function Backtest() {
         </div>
       )}
 
-      {!result && (
+      {error && <div className="bg-red-950/40 border border-red-800 text-red-300 rounded-xl p-4">{error}</div>}
+
+      {!result && !error && (
         <div className="bg-dark-800 rounded-xl p-8 border border-dark-600 text-center text-gray-500">
           点击「运行回测」开始
         </div>

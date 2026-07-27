@@ -17,19 +17,20 @@ async def get_latest_signal(
 ):
     """生成最新多因子信号"""
     klines = store.get_klines(symbol, timeframe, limit=lookback)
-    if len(klines) < 50:
-        return {"error": "Not enough data", "need_bars": 50, "have": len(klines)}
+    generator = MultiFactorSignal()
+    if len(klines) < generator.minimum_bars:
+        return {"error": "Not enough data", "need_bars": generator.minimum_bars, "have": len(klines)}
 
     klines = list(reversed(klines))
     close = np.array([k.close for k in klines])
     high = np.array([k.high for k in klines])
     low = np.array([k.low for k in klines])
+    volume = np.array([k.volume for k in klines])
 
     funding_rates_data = store.get_funding_rates(symbol, limit=20)
     funding_rates = [r.funding_rate for r in funding_rates_data]
 
-    generator = MultiFactorSignal()
-    signal = generator.generate(close, high, low, funding_rates=funding_rates)
+    signal = generator.generate(close, high, low, volume, funding_rates=funding_rates)
 
     return {
         "symbol": symbol,

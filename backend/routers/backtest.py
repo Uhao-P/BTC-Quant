@@ -9,6 +9,11 @@ from strategies.signal import MultiFactorSignal
 
 router = APIRouter()
 
+BARS_PER_YEAR = {
+    "1m": 365 * 24 * 60, "5m": 365 * 24 * 12, "15m": 365 * 24 * 4,
+    "1h": 365 * 24, "4h": 365 * 6, "1d": 365,
+}
+
 
 @router.get("/run")
 async def run_backtest(
@@ -41,7 +46,7 @@ async def run_backtest(
         )
         return signal if signal["direction"] != "neutral" else None
 
-    engine = BacktestEngine(df)
+    engine = BacktestEngine(df, bars_per_year=BARS_PER_YEAR.get(timeframe, 365))
     result = engine.run(signal_func)
 
     return {
