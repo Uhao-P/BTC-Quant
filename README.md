@@ -37,6 +37,40 @@ OKX REST / WebSocket
 
 ## 快速开始
 
+### Docker Compose（推荐）
+
+启动 API、OKX 数据采集器和前端：
+
+```bash
+docker compose up -d --build
+```
+
+启动完成后访问 [http://127.0.0.1:3000](http://127.0.0.1:3000)，API 位于 `http://127.0.0.1:8700`。SQLite 数据保存在 Docker 命名卷 `btc-quant_btc_quant_data` 中，重建容器不会丢失。
+
+如果当前网络访问 OKX 需要本机代理，请先设置容器可访问的代理地址（不要在容器中使用 `127.0.0.1`）：
+
+```bash
+export OKX_PROXY=http://host.docker.internal:7890
+docker compose up -d --build
+```
+
+查看状态与日志：
+
+```bash
+docker compose ps
+docker compose logs -f
+```
+
+停止服务：
+
+```bash
+docker compose down
+```
+
+如需同时删除已采集的数据卷，请明确执行 `docker compose down -v`。
+
+### 本地开发
+
 ```bash
 git clone https://github.com/Uhao-P/BTC-Quant.git
 cd BTC-Quant

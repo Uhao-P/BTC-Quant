@@ -2,6 +2,7 @@
   "name": "btc-quant-frontend",
   "private": true,
   "version": "0.1.0",
+  "packageManager": "pnpm@8.6.9",
   "type": "module",
   "scripts": {
     "dev": "vite",
