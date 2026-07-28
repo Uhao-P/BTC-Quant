@@ -56,4 +56,4 @@ class CollectorScheduler:
 
 if __name__ == "__main__":
     scheduler = CollectorScheduler()
-    asyncio.run(scheduler.run_loop(interval_sec=60))
+    asyncio.run(scheduler.run_loop(interval_sec=settings.COLLECTOR_INTERVAL_SEC))

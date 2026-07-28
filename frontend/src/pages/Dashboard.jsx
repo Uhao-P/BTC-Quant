@@ -2,6 +2,10 @@ import { useEffect, useState } from 'react';
 import axios from 'axios';
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, Area, AreaChart } from 'recharts';
 import AssetSelector from '../components/AssetSelector';
+import { formatChartTimestamp, formatUpdatedAt } from '../utils/dashboardFormat';
+
+const DASHBOARD_TIMEFRAME = '1m';
+const REFRESH_INTERVAL_MS = 10000;
 
 export default function Dashboard() {
   const [symbol, setSymbol] = useState('BTC-USDT-SWAP');
@@ -10,19 +14,23 @@ export default function Dashboard() {
   const [klines, setKlines] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [updatedAt, setUpdatedAt] = useState(null);
 
   useEffect(() => {
     const fetchData = async () => {
       try {
         const [klRes, sigRes] = await Promise.all([
-          axios.get(`/api/v1/data/klines?symbol=${encodeURIComponent(symbol)}&limit=200`),
+          axios.get(`/api/v1/data/klines?symbol=${encodeURIComponent(symbol)}&timeframe=${DASHBOARD_TIMEFRAME}&limit=200`),
           axios.get(`/api/v1/signals/latest?symbol=${encodeURIComponent(symbol)}`).catch(() => null),
         ]);
 
-        const data = klRes.data.data || [];
-        setKlines(data.reverse());
-        setPrice(data.length > 0 ? data[data.length - 1].close : null);
+        const newestFirst = klRes.data.data || [];
+        const chronological = [...newestFirst].reverse();
+        setKlines(chronological);
+        setPrice(newestFirst.length > 0 ? newestFirst[0].close : null);
         setSignal(sigRes?.data?.signal || null);
+        setUpdatedAt(new Date());
+        setError(null);
       } catch (e) {
         setError(e.message);
       } finally {
@@ -31,7 +39,7 @@ export default function Dashboard() {
     };
 
     fetchData();
-    const interval = setInterval(fetchData, 30000);
+    const interval = setInterval(fetchData, REFRESH_INTERVAL_MS);
     return () => clearInterval(interval);
   }, [symbol]);
 
@@ -39,7 +47,7 @@ export default function Dashboard() {
   if (error) return <div className="text-red-400">无法连接后端: {error}</div>;
 
   const chartData = klines.map((k) => ({
-    time: new Date(k.timestamp).toLocaleString('zh-CN', { hour: '2-digit', minute: '2-digit' }),
+    time: formatChartTimestamp(k.timestamp),
     price: k.close,
     volume: k.volume,
   }));
@@ -47,7 +55,12 @@ export default function Dashboard() {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold">{symbol} 仪表盘</h1>
+        <div>
+          <h1 className="text-2xl font-bold">{symbol} 仪表盘</h1>
+          <div className="mt-1 text-xs text-gray-500">
+            1 分钟行情 · 每 10 秒刷新{updatedAt ? ` · 最近更新 ${formatUpdatedAt(updatedAt)}` : ''}
+          </div>
+        </div>
         <AssetSelector value={symbol} onChange={setSymbol} />
       </div>
 
@@ -65,7 +78,7 @@ export default function Dashboard() {
 
       {/* Price Chart */}
       <div className="bg-dark-800 rounded-xl p-4 border border-dark-600">
-        <h2 className="text-sm font-medium text-gray-400 mb-3">价格走势 (1h)</h2>
+        <h2 className="text-sm font-medium text-gray-400 mb-3">价格走势 (1m)</h2>
         <ResponsiveContainer width="100%" height={400}>
           <AreaChart data={chartData}>
             <defs>
@@ -74,7 +87,11 @@ export default function Dashboard() {
                 <stop offset="95%" stopColor="#f59e0b" stopOpacity={0} />
               </linearGradient>
             </defs>
-            <XAxis dataKey="time" tick={{ fill: '#6b7280', fontSize: 11 }} />
+            <XAxis
+              dataKey="time"
+              minTickGap={42}
+              tick={{ fill: '#6b7280', fontSize: 11 }}
+            />
             <YAxis domain={['auto', 'auto']} tick={{ fill: '#6b7280', fontSize: 11 }} />
             <Tooltip
               contentStyle={{ background: '#1a1a25', border: '1px solid #2e2e45', borderRadius: 8 }}

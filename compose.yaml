@@ -11,6 +11,7 @@ x-python-service: &python-service
     SYMBOLS: '["BTC-USDT-SWAP","ETH-USDT-SWAP","DOGE-USDT-SWAP"]'
     COLLECTION_TIMEFRAMES: '["1m","5m","1h"]'
     MARKET_DATA_PROVIDER: ${MARKET_DATA_PROVIDER:-binance}
+    COLLECTOR_INTERVAL_SEC: ${COLLECTOR_INTERVAL_SEC:-15}
   volumes:
     - btc_quant_data:/app/storage
 
