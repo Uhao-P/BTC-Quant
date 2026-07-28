@@ -25,6 +25,8 @@ export default function DataPage() {
       }
     };
     fetch();
+    const interval = setInterval(fetch, 30000);
+    return () => clearInterval(interval);
   }, [symbol]);
 
   const formatTime = (ts) => new Date(ts).toLocaleString('zh-CN');

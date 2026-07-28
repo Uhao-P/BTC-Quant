@@ -7,17 +7,25 @@ export default function Signals() {
   const [signals, setSignals] = useState([]);
   const [loading, setLoading] = useState(false);
 
-  const fetchSignal = async () => {
+  const fetchSignal = async (replace = false) => {
     setLoading(true);
     try {
       const res = await axios.get(`/api/v1/signals/latest?symbol=${encodeURIComponent(symbol)}`);
-      setSignals((prev) => [res.data.signal, ...prev].slice(0, 50));
+      if (res.data.signal) {
+        setSignals((prev) => replace ? [res.data.signal] : [res.data.signal, ...prev].slice(0, 50));
+      }
     } catch (e) {
       console.error(e);
     } finally {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    fetchSignal(true);
+    const interval = setInterval(() => fetchSignal(true), 30000);
+    return () => clearInterval(interval);
+  }, [symbol]);
 
   return (
     <div className="space-y-6">
@@ -26,7 +34,7 @@ export default function Signals() {
         <div className="flex gap-3">
         <AssetSelector value={symbol} onChange={(value) => { setSymbol(value); setSignals([]); }} />
         <button
-          onClick={fetchSignal}
+          onClick={() => fetchSignal(false)}
           disabled={loading}
           className="px-4 py-2 bg-dark-600 hover:bg-dark-500 rounded-lg text-sm transition-colors disabled:opacity-50"
         >

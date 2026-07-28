@@ -26,6 +26,14 @@ class DataStore:
             Kline.timestamp == row["timestamp"],
         ).first()
         if exists:
+            exists.open = row["open"]
+            exists.high = row["high"]
+            exists.low = row["low"]
+            exists.close = row["close"]
+            exists.volume = row["volume"]
+            exists.quote_volume = row.get("quote_volume")
+            if "oi" in row:
+                exists.oi = row["oi"]
             return False
         k = Kline(**row, created_at=datetime.utcnow())
         session.add(k)
