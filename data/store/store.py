@@ -9,7 +9,7 @@ from sqlalchemy import func, text
 from sqlalchemy.orm import Session as DBSession
 
 from data.schema.models import (
-    Kline, FundingRate, IndicatorValue, Signal, init_db,
+    Kline, FundingRate, IndicatorValue, Signal, AIPredictionRecord, init_db,
 )
 from config.settings import settings
 
@@ -376,6 +376,18 @@ class DataStore:
                 "old_indicators": old_indicators,
                 "duplicate_signals": duplicate_signals,
             }
+
+    # --- AI predictions ---
+    def save_ai_prediction(self, session: DBSession, row: dict):
+        record = AIPredictionRecord(**row, created_at=datetime.utcnow())
+        session.add(record)
+        return record
+
+    def get_latest_ai_prediction(self, symbol: str):
+        with self.get_session() as session:
+            return session.query(AIPredictionRecord).filter(
+                AIPredictionRecord.symbol == symbol
+            ).order_by(AIPredictionRecord.created_at.desc()).first()
 
 
 store = DataStore()

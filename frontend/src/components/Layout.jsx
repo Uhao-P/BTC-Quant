@@ -4,6 +4,7 @@ const navItems = [
   { path: '/', label: '仪表盘', icon: '📊' },
   { path: '/signals', label: '交易信号', icon: '⚡' },
   { path: '/backtest', label: '回测', icon: '📈' },
+  { path: '/ai-prediction', label: 'AI 预测', icon: '🤖' },
   { path: '/data', label: '数据', icon: '📁' },
 ];
 

@@ -15,6 +15,7 @@ COPY data ./data
 COPY indicators ./indicators
 COPY scripts ./scripts
 COPY strategies ./strategies
+COPY services ./services
 COPY __init__.py ./
 
 RUN mkdir -p /app/storage

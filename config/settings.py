@@ -33,6 +33,12 @@ class Settings(BaseSettings):
     # --- Prediction ---
     PREDICTION_HORIZON: int = 12  # forecast steps (in units of timeframe)
     DEFAULT_TIMEFRAME: str = "1h"
+    LLM_API_KEY: str = ""
+    LLM_BASE_URL: str = "https://api.openai.com/v1"
+    LLM_MODEL: str = "gpt-5.6-terra"
+    LLM_API_STYLE: str = "responses"  # responses | chat_completions
+    LLM_REASONING_EFFORT: str = "medium"
+    NEWS_RSS_URL: str = "https://news.google.com/rss/search?q={query}&hl=en-US&gl=US&ceid=US:en"
 
     # --- Backtest ---
     BACKTEST_INITIAL_CAPITAL: float = 10000.0

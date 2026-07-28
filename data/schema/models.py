@@ -80,6 +80,20 @@ class Signal(Base):
     created_at = Column(DateTime, nullable=False)
 
 
+class AIPredictionRecord(Base):
+    """Persisted LLM analysis so page refreshes do not discard results."""
+    __tablename__ = "ai_predictions"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    symbol = Column(String(20), nullable=False, index=True)
+    model = Column(String(100), nullable=False)
+    prompt = Column(Text, nullable=False)
+    snapshot = Column(Text, nullable=False)
+    news = Column(Text, nullable=False)
+    analysis = Column(Text, nullable=False)
+    created_at = Column(DateTime, nullable=False, index=True)
+
+
 def init_db(db_url: str) -> tuple:
     connect_args = {"timeout": 30} if db_url.startswith("sqlite") else {}
     engine = create_engine(db_url, echo=False, connect_args=connect_args)

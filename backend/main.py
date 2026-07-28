@@ -12,6 +12,7 @@ from backend.routers.data import router as data_router
 from backend.routers.indicators import router as indicators_router
 from backend.routers.signals import router as signals_router
 from backend.routers.backtest import router as backtest_router
+from backend.routers.ai_prediction import router as ai_prediction_router
 
 
 @asynccontextmanager
@@ -39,6 +40,7 @@ app.include_router(data_router, prefix="/api/v1/data", tags=["Data"])
 app.include_router(indicators_router, prefix="/api/v1/indicators", tags=["Indicators"])
 app.include_router(signals_router, prefix="/api/v1/signals", tags=["Signals"])
 app.include_router(backtest_router, prefix="/api/v1/backtest", tags=["Backtest"])
+app.include_router(ai_prediction_router, prefix="/api/v1/ai-prediction", tags=["AI Prediction"])
 
 
 @app.get("/")

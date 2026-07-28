@@ -4,6 +4,7 @@ import Dashboard from './pages/Dashboard';
 import Signals from './pages/Signals';
 import Backtest from './pages/Backtest';
 import DataPage from './pages/DataPage';
+import AIPrediction from './pages/AIPrediction';
 
 export default function App() {
   return (
@@ -14,6 +15,7 @@ export default function App() {
           <Route path="/signals" element={<Signals />} />
           <Route path="/backtest" element={<Backtest />} />
           <Route path="/data" element={<DataPage />} />
+          <Route path="/ai-prediction" element={<AIPrediction />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Route>
       </Routes>

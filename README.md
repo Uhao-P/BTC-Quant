@@ -218,3 +218,25 @@ tests/         自动化测试
 ## 许可与风险
 
 本仓库当前未附带开源许可证。加密资产及杠杆交易风险很高，请自行承担使用本项目及其输出的全部风险。
+
+### 大模型预测
+
+网页侧栏的「AI 预测」会汇总当前币种的价格变化、技术指标、量化信号、资金费率、近期信号、回测统计和相关新闻，并展示实际发送给模型的完整 Prompt。模型返回做多、做空或观望结论、置信度、多空证据、风险和观点失效条件；最近一次分析会保存到数据库，刷新页面不会丢失。
+
+先在 `.env` 中配置模型（默认使用 OpenAI Responses API）：
+
+```env
+LLM_API_KEY=your-api-key
+LLM_BASE_URL=https://api.openai.com/v1
+LLM_MODEL=gpt-5.6-terra
+LLM_API_STYLE=responses
+LLM_REASONING_EFFORT=medium
+```
+
+也可接入兼容 Chat Completions 的服务，将 `LLM_BASE_URL` 改为对应地址，并设置 `LLM_API_STYLE=chat_completions`。修改后运行 `docker compose up -d --build api frontend`。
+
+- `GET /api/v1/ai-prediction/context`：汇总证据、新闻并生成 Prompt，不调用模型
+- `POST /api/v1/ai-prediction/analyze`：调用模型并持久化分析
+- `GET /api/v1/ai-prediction/latest`：读取最近一次已保存分析
+
+> 大模型输出仅供研究，不构成投资建议。
