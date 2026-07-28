@@ -1,7 +1,7 @@
 """
 数据表结构
 """
-from sqlalchemy import create_engine, Column, Integer, Float, String, DateTime, Index, Text
+from sqlalchemy import create_engine, Column, Integer, Float, String, DateTime, Index, Text, event
 from sqlalchemy.orm import declarative_base, sessionmaker
 
 Base = declarative_base()
@@ -81,7 +81,16 @@ class Signal(Base):
 
 
 def init_db(db_url: str) -> tuple:
-    engine = create_engine(db_url, echo=False)
+    connect_args = {"timeout": 30} if db_url.startswith("sqlite") else {}
+    engine = create_engine(db_url, echo=False, connect_args=connect_args)
+    if db_url.startswith("sqlite"):
+        @event.listens_for(engine, "connect")
+        def configure_sqlite(dbapi_connection, _connection_record):
+            cursor = dbapi_connection.cursor()
+            cursor.execute("PRAGMA journal_mode=WAL")
+            cursor.execute("PRAGMA synchronous=NORMAL")
+            cursor.execute("PRAGMA busy_timeout=30000")
+            cursor.close()
     Base.metadata.create_all(engine)
     Session = sessionmaker(bind=engine)
     return engine, Session

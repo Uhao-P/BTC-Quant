@@ -18,7 +18,7 @@ class Settings(BaseSettings):
     # --- Data ---
     SYMBOLS: list[str] = ["BTC-USDT-SWAP", "ETH-USDT-SWAP", "DOGE-USDT-SWAP"]
     TIMEFRAMES: list[str] = ["1m", "5m", "15m", "1h", "4h", "1d"]
-    COLLECTION_TIMEFRAMES: list[str] = ["1m", "5m", "1h"]
+    COLLECTION_TIMEFRAMES: list[str] = ["1m"]
 
     # --- Database ---
     DATABASE_URL: str = "sqlite:///./data/btc_quant.db"

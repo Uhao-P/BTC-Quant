@@ -35,15 +35,15 @@ class AssetApiTests(unittest.TestCase):
                 signal_store.save_klines_batch(session, [
                     {
                         "symbol": "BTC-USDT-SWAP",
-                        "timeframe": "1h",
-                        "timestamp": start + timedelta(hours=index),
-                        "open": 100 + index,
-                        "high": 102 + index,
-                        "low": 99 + index,
-                        "close": 101 + index,
+                        "timeframe": "1m",
+                        "timestamp": start + timedelta(minutes=index),
+                        "open": 100 + index / 60,
+                        "high": 102 + index / 60,
+                        "low": 99 + index / 60,
+                        "close": 101 + index / 60,
                         "volume": 1000 + index,
                     }
-                    for index in range(80)
+                    for index in range(80 * 60)
                 ])
                 session.commit()
 

@@ -21,7 +21,7 @@ class CollectorScheduler:
         """拉取一次所有配置的数据"""
         print(f"[{datetime.now().isoformat()}] Collecting data...")
         for symbol in settings.SYMBOLS:
-            for tf in settings.COLLECTION_TIMEFRAMES:
+            for tf in ("1m",):
                 try:
                     existing = len(store.get_klines(symbol, tf, limit=150))
                     fetch_limit = max(5, 150 - existing)

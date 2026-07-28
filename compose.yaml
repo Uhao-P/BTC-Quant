@@ -9,7 +9,7 @@ x-python-service: &python-service
     DATABASE_URL: sqlite:////app/storage/btc_quant.db
     OKX_PROXY: ${OKX_PROXY:-}
     SYMBOLS: '["BTC-USDT-SWAP","ETH-USDT-SWAP","DOGE-USDT-SWAP"]'
-    COLLECTION_TIMEFRAMES: '["1m","5m","1h"]'
+    COLLECTION_TIMEFRAMES: '["1m"]'
     MARKET_DATA_PROVIDER: ${MARKET_DATA_PROVIDER:-binance}
     COLLECTOR_INTERVAL_SEC: ${COLLECTOR_INTERVAL_SEC:-15}
   volumes:
@@ -38,6 +38,12 @@ services:
     depends_on:
       api:
         condition: service_healthy
+
+  history-backfill:
+    <<: *python-service
+    profiles: ["tools"]
+    restart: "no"
+    command: ["python", "-m", "scripts.backfill", "--all-history", "--cleanup-derived"]
 
   frontend:
     build:

@@ -1,6 +1,6 @@
 """Binance USD-M futures collector with the project's normalized schema."""
 import asyncio
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 
 import httpx
@@ -90,6 +90,43 @@ class BinanceCollector:
                 after = next_after
                 await asyncio.sleep(0.2)
 
+    async def backfill_all_1m(
+        self, symbol: str, page_size: int = 1500, pause_sec: float = 0.2
+    ) -> dict:
+        """Resume backwards from the oldest local minute until the listing boundary."""
+        oldest = store.get_oldest_kline_timestamp(symbol, "1m")
+        after = (
+            str(int(oldest.replace(tzinfo=timezone.utc).timestamp() * 1000))
+            if oldest else None
+        )
+        stored = 0
+        pages = 0
+
+        while True:
+            rows = await self.fetch_historical_klines(
+                symbol, "1m", limit=page_size, after=after
+            )
+            if not rows:
+                break
+            with store.get_session() as session:
+                new = store.save_klines_batch(session, rows)
+                session.commit()
+            stored += new
+            pages += 1
+            oldest = min(row["timestamp"] for row in rows)
+            next_after = str(int(oldest.replace(tzinfo=timezone.utc).timestamp() * 1000))
+            print(
+                f"[full-backfill] {symbol}: page={pages} +{new} "
+                f"stored={stored} oldest={oldest.isoformat()}"
+            )
+            if next_after == after:
+                break
+            after = next_after
+            if pause_sec:
+                await asyncio.sleep(pause_sec)
+
+        return {"symbol": symbol, "stored": stored, "oldest": oldest, "pages": pages}
+
     async def fetch_funding_rate(self, symbol: str = "BTC-USDT-SWAP") -> dict:
         row = await self._get("/fapi/v1/premiumIndex", {"symbol": self._symbol(symbol)})
         timestamp_ms = int(row.get("time") or row.get("nextFundingTime"))
@@ -98,4 +135,3 @@ class BinanceCollector:
             "timestamp": datetime.utcfromtimestamp(timestamp_ms / 1000),
             "funding_rate": float(row["lastFundingRate"]),
         }
-

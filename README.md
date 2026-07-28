@@ -7,7 +7,7 @@
 ## 功能
 
 - 支持 `BTC-USDT-SWAP`、`ETH-USDT-SWAP` 与 `DOGE-USDT-SWAP`
-- 从 OKX 回填历史 K 线，并定时采集 `1m`、`5m`、`1h` K 线和资金费率
+- 从 Binance/OKX 回填历史 K 线，仅永久保存 `1m` 原始行情，并按需聚合 `5m`、`15m`、`1h`、`4h`、`1d`
 - RSI、MACD、布林带、EMA、ATR 等技术指标
 - 市场状态多因子策略：趋势、动量、RSI、成交量、资金费率拥挤度与 ATR 风控
 - 线性永续合约回测：多空、反向开仓、手续费、滑点、止盈止损、净值、回撤与夏普比率
@@ -85,17 +85,34 @@ cp .env.example .env
 make init
 ```
 
-回填历史数据（例如 BTC 1 小时 K 线）：
+### 完整历史数据
+
+推荐只永久保存一分钟原始行情。其他周期由 API 从一分钟行情实时聚合，不会重复占用磁盘。Docker 中启动三个币的完整历史回填：
 
 ```bash
-make backfill ARGS="--symbol BTC-USDT-SWAP --timeframe 1h --bars 1000"
+docker compose --profile tools run -d --name btc-quant-history-backfill history-backfill
+docker logs -f btc-quant-history-backfill
+```
+
+任务会先为 BTC、ETH、DOGE 各回填最近 7 天，保证仪表盘、信号和回测尽快可用，然后从本地最早记录继续向前回填到交易所上市边界。任务可以安全中断并用同一命令续传。完整回填成功后，会自动删除旧版直接保存的 `5m`、`1h` 数据。
+
+查看数据库占用：
+
+```bash
+docker compose exec api du -h /app/storage/btc_quant.db
+```
+
+普通的定量回填仍然可用（例如 BTC 一分钟 K 线）：
+
+```bash
+make backfill ARGS="--symbol BTC-USDT-SWAP --timeframe 1m --bars 1000"
 ```
 
 也可回填 ETH 或 DOGE：
 
 ```bash
-make backfill ARGS="--symbol ETH-USDT-SWAP --timeframe 1h --bars 1000"
-make backfill ARGS="--symbol DOGE-USDT-SWAP --timeframe 1h --bars 1000"
+make backfill ARGS="--symbol ETH-USDT-SWAP --timeframe 1m --bars 1000"
+make backfill ARGS="--symbol DOGE-USDT-SWAP --timeframe 1m --bars 1000"
 ```
 
 启动后端：
