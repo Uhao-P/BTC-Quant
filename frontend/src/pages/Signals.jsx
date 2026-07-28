@@ -7,12 +7,21 @@ export default function Signals() {
   const [signals, setSignals] = useState([]);
   const [loading, setLoading] = useState(false);
 
-  const fetchSignal = async (replace = false) => {
+  const fetchHistory = async () => {
+    try {
+      const res = await axios.get(`/api/v1/signals/history?symbol=${encodeURIComponent(symbol)}&limit=50`);
+      setSignals(res.data.data || []);
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const generateSignal = async () => {
     setLoading(true);
     try {
-      const res = await axios.get(`/api/v1/signals/latest?symbol=${encodeURIComponent(symbol)}`);
+      const res = await axios.post(`/api/v1/signals/generate?symbol=${encodeURIComponent(symbol)}`);
       if (res.data.signal) {
-        setSignals((prev) => replace ? [res.data.signal] : [res.data.signal, ...prev].slice(0, 50));
+        await fetchHistory();
       }
     } catch (e) {
       console.error(e);
@@ -22,8 +31,8 @@ export default function Signals() {
   };
 
   useEffect(() => {
-    fetchSignal(true);
-    const interval = setInterval(() => fetchSignal(true), 30000);
+    fetchHistory();
+    const interval = setInterval(fetchHistory, 30000);
     return () => clearInterval(interval);
   }, [symbol]);
 
@@ -34,7 +43,7 @@ export default function Signals() {
         <div className="flex gap-3">
         <AssetSelector value={symbol} onChange={(value) => { setSymbol(value); setSignals([]); }} />
         <button
-          onClick={() => fetchSignal(false)}
+          onClick={generateSignal}
           disabled={loading}
           className="px-4 py-2 bg-dark-600 hover:bg-dark-500 rounded-lg text-sm transition-colors disabled:opacity-50"
         >
@@ -52,7 +61,7 @@ export default function Signals() {
             <div className="p-8 text-center text-gray-500">点击「生成新信号」开始</div>
           ) : (
             signals.map((s, i) => (
-              <div key={i} className="p-4">
+              <div key={s.id ?? `${s.timestamp}-${i}`} className="p-4">
                 <div className="flex items-center gap-3 mb-2">
                   <span className={`px-2 py-0.5 rounded text-xs font-bold ${
                     s.direction === 'long' ? 'bg-green-900 text-green-400' :
@@ -63,6 +72,7 @@ export default function Signals() {
                   </span>
                   <span className="text-sm text-gray-400">评分: {s.score}</span>
                   <span className="text-sm text-gray-400">强度: {(s.strength * 100).toFixed(0)}%</span>
+                  {s.timestamp && <span className="text-xs text-gray-500">{new Date(s.timestamp).toLocaleString('zh-CN')}</span>}
                 </div>
                 <div className="flex flex-wrap gap-2">
                   {s.reasons?.map((r, j) => (

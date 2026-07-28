@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import axios from 'axios';
-import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, Area, AreaChart } from 'recharts';
+import { XAxis, YAxis, Tooltip, ResponsiveContainer, Area, AreaChart, Brush } from 'recharts';
 import AssetSelector from '../components/AssetSelector';
 import { formatChartTimestamp, formatUpdatedAt } from '../utils/dashboardFormat';
 
@@ -79,6 +79,7 @@ export default function Dashboard() {
       {/* Price Chart */}
       <div className="bg-dark-800 rounded-xl p-4 border border-dark-600">
         <h2 className="text-sm font-medium text-gray-400 mb-3">价格走势 (1m)</h2>
+        <div className="mb-2 text-xs text-gray-500">拖动图表底部滑块可缩放时间范围</div>
         <ResponsiveContainer width="100%" height={400}>
           <AreaChart data={chartData}>
             <defs>
@@ -98,6 +99,13 @@ export default function Dashboard() {
               labelStyle={{ color: '#9ca3af' }}
             />
             <Area type="monotone" dataKey="price" stroke="#f59e0b" fill="url(#colorPrice)" strokeWidth={2} />
+            <Brush
+              dataKey="time"
+              height={28}
+              stroke="#f59e0b"
+              fill="#171722"
+              travellerWidth={10}
+            />
           </AreaChart>
         </ResponsiveContainer>
       </div>

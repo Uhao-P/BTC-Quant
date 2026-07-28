@@ -96,7 +96,7 @@ class DataStore:
             q = s.query(Signal).filter(Signal.symbol == symbol)
             if strategy:
                 q = q.filter(Signal.strategy == strategy)
-            return q.order_by(Signal.timestamp.desc()).limit(limit).all()
+            return q.order_by(Signal.timestamp.desc(), Signal.id.desc()).limit(limit).all()
 
 
 store = DataStore()
