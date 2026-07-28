@@ -88,3 +88,26 @@ def test_cleanup_removes_legacy_derived_candles_only(tmp_path):
 
     assert store.delete_derived_klines() == 2
     assert len(store.get_klines("BTC-USDT-SWAP", "1m", limit=10)) == 1
+
+
+def test_signal_save_updates_same_strategy_candle_instead_of_duplicating(tmp_path):
+    store = DataStore(f"sqlite:///{tmp_path / 'signals.db'}")
+    timestamp = datetime(2026, 7, 28, 10, 0)
+    base = {
+        "symbol": "BTC-USDT-SWAP",
+        "timeframe": "1h",
+        "timestamp": timestamp,
+        "direction": "long",
+        "strength": 0.5,
+        "strategy": "test-strategy",
+        "features": '{"score": 2.5}',
+    }
+    with store.get_session() as session:
+        assert store.save_signal(session, base) is True
+        session.commit()
+        assert store.save_signal(session, {**base, "strength": 0.8}) is False
+        session.commit()
+
+    signals = store.get_signals("BTC-USDT-SWAP")
+    assert len(signals) == 1
+    assert signals[0].strength == 0.8

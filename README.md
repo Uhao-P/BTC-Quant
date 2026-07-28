@@ -94,7 +94,15 @@ docker compose --profile tools run -d --name btc-quant-history-backfill history-
 docker logs -f btc-quant-history-backfill
 ```
 
-任务会先为 BTC、ETH、DOGE 各回填最近 7 天，保证仪表盘、信号和回测尽快可用，然后从本地最早记录继续向前回填到交易所上市边界。任务可以安全中断并用同一命令续传。完整回填成功后，会自动删除旧版直接保存的 `5m`、`1h` 数据。
+任务会先为 BTC、ETH、DOGE 各回填最近 7 天，保证仪表盘、信号和回测尽快可用，然后从本地最早记录继续向前回填到交易所上市边界。完整回填成功后，会自动删除旧版直接保存的 `5m`、`1h` 数据。日常采集器还会每天执行一次维护：同一根 K 线的同策略信号采用更新而非重复插入，信号默认保留 365 天，指标缓存默认保留 90 天。
+
+任务被中断后，可从数据库中已有的最早一分钟继续：
+
+```bash
+docker start -a btc-quant-history-backfill
+```
+
+如果容器已经完成而需要重新创建，先执行 `docker rm btc-quant-history-backfill`，再执行上面的首次启动命令。删除回填容器不会删除命名卷中的行情数据。
 
 查看数据库占用：
 

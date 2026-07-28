@@ -2,7 +2,7 @@
 数据存储层
 """
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 from sqlalchemy.orm import Session as DBSession
 
@@ -197,8 +197,21 @@ class DataStore:
 
     # --- Signals ---
     def save_signal(self, session: DBSession, row: dict):
+        existing = session.query(Signal).filter(
+            Signal.symbol == row["symbol"],
+            Signal.timeframe == row["timeframe"],
+            Signal.timestamp == row["timestamp"],
+            Signal.strategy == row["strategy"],
+        ).first()
+        if existing:
+            existing.direction = row["direction"]
+            existing.strength = row["strength"]
+            existing.features = row.get("features")
+            existing.created_at = datetime.utcnow()
+            return False
         sg = Signal(**row, created_at=datetime.utcnow())
         session.add(sg)
+        return True
 
     def get_signals(self, symbol: str, strategy: str = None,
                     limit: int = 100) -> list[Signal]:
@@ -207,6 +220,37 @@ class DataStore:
             if strategy:
                 q = q.filter(Signal.strategy == strategy)
             return q.order_by(Signal.timestamp.desc(), Signal.id.desc()).limit(limit).all()
+
+    def prune_research_data(self, signal_days: int = 365,
+                            indicator_days: int = 90) -> dict:
+        """Expire research caches and remove legacy duplicate signal rows."""
+        now = datetime.utcnow()
+        with self.get_session() as session:
+            old_signals = session.query(Signal).filter(
+                Signal.timestamp < now - timedelta(days=signal_days)
+            ).delete(synchronize_session=False)
+            old_indicators = session.query(IndicatorValue).filter(
+                IndicatorValue.timestamp < now - timedelta(days=indicator_days)
+            ).delete(synchronize_session=False)
+
+            duplicate_signals = 0
+            seen = set()
+            rows = session.query(Signal).order_by(
+                Signal.created_at.desc(), Signal.id.desc()
+            ).all()
+            for row in rows:
+                key = (row.symbol, row.timeframe, row.timestamp, row.strategy)
+                if key in seen:
+                    session.delete(row)
+                    duplicate_signals += 1
+                else:
+                    seen.add(key)
+            session.commit()
+            return {
+                "old_signals": old_signals,
+                "old_indicators": old_indicators,
+                "duplicate_signals": duplicate_signals,
+            }
 
 
 store = DataStore()

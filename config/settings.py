@@ -26,6 +26,9 @@ class Settings(BaseSettings):
     # --- Collection ---
     COLLECTOR_INTERVAL_SEC: int = 60  # kline collector interval
     FUNDING_INTERVAL_SEC: int = 3600  # funding rate collector interval
+    MAINTENANCE_INTERVAL_SEC: int = 86400
+    SIGNAL_RETENTION_DAYS: int = 365
+    INDICATOR_RETENTION_DAYS: int = 90
 
     # --- Prediction ---
     PREDICTION_HORIZON: int = 12  # forecast steps (in units of timeframe)

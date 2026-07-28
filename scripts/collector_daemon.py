@@ -14,14 +14,17 @@ class CollectorScheduler:
     """定时采集调度器"""
 
     def __init__(self):
+        if settings.COLLECTION_TIMEFRAMES != ["1m"]:
+            raise ValueError("COLLECTION_TIMEFRAMES must be exactly ['1m']; higher intervals are derived")
         self.collector = create_collector(settings.MARKET_DATA_PROVIDER)
         self._running = False
+        self._last_maintenance = 0.0
 
     async def run_once(self):
         """拉取一次所有配置的数据"""
         print(f"[{datetime.now().isoformat()}] Collecting data...")
         for symbol in settings.SYMBOLS:
-            for tf in ("1m",):
+            for tf in settings.COLLECTION_TIMEFRAMES:
                 try:
                     existing = len(store.get_klines(symbol, tf, limit=150))
                     fetch_limit = max(5, 150 - existing)
@@ -44,6 +47,14 @@ class CollectorScheduler:
                 print(f"  {symbol} funding rate: {fr['funding_rate']:.6f}")
             except Exception as e:
                 print(f"  ERROR {symbol} funding: {e}")
+
+        if time.time() - self._last_maintenance >= settings.MAINTENANCE_INTERVAL_SEC:
+            result = store.prune_research_data(
+                signal_days=settings.SIGNAL_RETENTION_DAYS,
+                indicator_days=settings.INDICATOR_RETENTION_DAYS,
+            )
+            self._last_maintenance = time.time()
+            print(f"  Maintenance: {result}")
 
     async def run_loop(self, interval_sec: int = 60):
         """定时循环"""

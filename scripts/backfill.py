@@ -10,7 +10,10 @@ from data.collectors import create_collector
 
 async def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--timeframe", default="1h", help="K line timeframe")
+    parser.add_argument(
+        "--timeframe", choices=["1m"], default="1m",
+        help="Raw storage timeframe (only 1m is supported)",
+    )
     parser.add_argument("--bars", type=int, default=1000, help="Number of bars")
     parser.add_argument("--symbol", default="BTC-USDT-SWAP")
     parser.add_argument(
