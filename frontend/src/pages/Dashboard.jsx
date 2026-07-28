@@ -3,6 +3,7 @@ import axios from 'axios';
 import { XAxis, YAxis, Tooltip, ResponsiveContainer, Area, AreaChart, Brush, Line, LineChart } from 'recharts';
 import AssetSelector from '../components/AssetSelector';
 import { formatHistoryTimestamp, formatUpdatedAt } from '../utils/dashboardFormat';
+import { clampBrushRange, findBrushIndexes, toDateTimeInput } from '../utils/historyRange';
 
 const DASHBOARD_TIMEFRAME = '1m';
 const REFRESH_INTERVAL_MS = 10000;
@@ -25,6 +26,9 @@ export default function Dashboard() {
   const [error, setError] = useState(null);
   const [updatedAt, setUpdatedAt] = useState(null);
   const [historyRange, setHistoryRange] = useState(null);
+  const [brushRange, setBrushRange] = useState({ startIndex: 0, endIndex: 0 });
+  const [rangeInputs, setRangeInputs] = useState({ start: '', end: '' });
+  const [rangeError, setRangeError] = useState('');
   const selectedRangeRef = useRef(null);
   const detailRequestRef = useRef(0);
   const brushTimerRef = useRef(null);
@@ -62,7 +66,20 @@ export default function Dashboard() {
         if (!active) return;
         const points = res.data.data || [];
         setOverviewData(points);
-        if (!selectedRangeRef.current) setDetailData(points);
+        if (!selectedRangeRef.current) {
+          setDetailData(points);
+          setBrushRange(clampBrushRange(
+            { startIndex: 0, endIndex: points.length - 1 }, points.length,
+          ));
+          setRangeInputs({
+            start: toDateTimeInput(res.data.oldest),
+            end: toDateTimeInput(res.data.latest),
+          });
+        } else {
+          setBrushRange(findBrushIndexes(
+            points, selectedRangeRef.current.start, selectedRangeRef.current.end,
+          ));
+        }
         setHistoryRange(res.data);
         setError(null);
       } catch (e) {
@@ -77,6 +94,9 @@ export default function Dashboard() {
     setOverviewData([]);
     setDetailData([]);
     setHistoryRange(null);
+    setBrushRange({ startIndex: 0, endIndex: 0 });
+    setRangeInputs({ start: '', end: '' });
+    setRangeError('');
     selectedRangeRef.current = null;
     Promise.all([fetchLiveData(), fetchHistory()]);
     const liveInterval = setInterval(fetchLiveData, REFRESH_INTERVAL_MS);
@@ -90,34 +110,84 @@ export default function Dashboard() {
     };
   }, [symbol]);
 
+  useEffect(() => {
+    if (!selectedRangeRef.current && overviewData.length) {
+      setBrushRange({ startIndex: 0, endIndex: overviewData.length - 1 });
+    }
+  }, [overviewData.length]);
+
+  const loadDetailRange = async (selection) => {
+    selectedRangeRef.current = selection;
+    const requestId = ++detailRequestRef.current;
+    try {
+      const params = new URLSearchParams({
+        symbol,
+        max_points: '2500',
+        start: selection.start,
+        end: selection.end,
+      });
+      const res = await axios.get(`/api/v1/data/price-history?${params}`);
+      if (requestId === detailRequestRef.current) {
+        setDetailData(res.data.data || []);
+        setRangeError('');
+      }
+    } catch (e) {
+      if (requestId === detailRequestRef.current) setError(e.message);
+    }
+  };
+
+  const resetFullHistory = () => {
+    detailRequestRef.current += 1;
+    selectedRangeRef.current = null;
+    setBrushRange(clampBrushRange(
+      { startIndex: 0, endIndex: overviewData.length - 1 }, overviewData.length,
+    ));
+    setDetailData(overviewData);
+    setRangeInputs({
+      start: toDateTimeInput(historyRange?.oldest),
+      end: toDateTimeInput(historyRange?.latest),
+    });
+    setRangeError('');
+  };
+
   const handleBrushChange = (range) => {
     if (!range || !overviewData.length) return;
+    const nextRange = clampBrushRange(range, overviewData.length);
+    setBrushRange(nextRange);
     clearTimeout(brushTimerRef.current);
     brushTimerRef.current = setTimeout(async () => {
-      const startPoint = overviewData[range.startIndex];
-      const endPoint = overviewData[range.endIndex];
+      const startPoint = overviewData[nextRange.startIndex];
+      const endPoint = overviewData[nextRange.endIndex];
       if (!startPoint || !endPoint) return;
-      if (range.startIndex === 0 && range.endIndex === overviewData.length - 1) {
-        selectedRangeRef.current = null;
-        setDetailData(overviewData);
+      setRangeInputs({
+        start: toDateTimeInput(startPoint.timestamp),
+        end: toDateTimeInput(endPoint.timestamp),
+      });
+      if (nextRange.startIndex === 0 && nextRange.endIndex === overviewData.length - 1) {
+        resetFullHistory();
         return;
       }
       const selection = { start: startPoint.timestamp, end: endPoint.timestamp };
-      selectedRangeRef.current = selection;
-      const requestId = ++detailRequestRef.current;
-      try {
-        const params = new URLSearchParams({
-          symbol,
-          max_points: '2500',
-          start: selection.start,
-          end: selection.end,
-        });
-        const res = await axios.get(`/api/v1/data/price-history?${params}`);
-        if (requestId === detailRequestRef.current) setDetailData(res.data.data || []);
-      } catch (e) {
-        if (requestId === detailRequestRef.current) setError(e.message);
-      }
+      await loadDetailRange(selection);
     }, 250);
+  };
+
+  const applyDirectRange = async (event) => {
+    event.preventDefault();
+    if (!rangeInputs.start || !rangeInputs.end) {
+      setRangeError('请选择开始时间和结束时间');
+      return;
+    }
+    if (rangeInputs.start >= rangeInputs.end) {
+      setRangeError('结束时间必须晚于开始时间');
+      return;
+    }
+    const selection = {
+      start: `${rangeInputs.start}:00`,
+      end: `${rangeInputs.end}:00`,
+    };
+    setBrushRange(findBrushIndexes(overviewData, selection.start, selection.end));
+    await loadDetailRange(selection);
   };
 
   if (loading) return <div className="text-gray-400">加载中...</div>;
@@ -162,6 +232,37 @@ export default function Dashboard() {
             ? ` · ${formatHistoryTimestamp(historyRange.oldest)} 至 ${formatHistoryTimestamp(historyRange.latest)} · ${historyRange.source_count.toLocaleString()} 根分钟线`
             : ''}
         </div>
+        <form onSubmit={applyDirectRange} className="mb-4 flex flex-wrap items-end gap-3">
+          <label className="text-xs text-gray-400">
+            <span className="mb-1 block">开始时间</span>
+            <input
+              type="datetime-local"
+              value={rangeInputs.start}
+              min={toDateTimeInput(historyRange?.oldest)}
+              max={toDateTimeInput(historyRange?.latest)}
+              onChange={(event) => setRangeInputs((value) => ({ ...value, start: event.target.value }))}
+              className="rounded border border-dark-600 bg-dark-700 px-3 py-2 text-sm text-gray-200"
+            />
+          </label>
+          <label className="text-xs text-gray-400">
+            <span className="mb-1 block">结束时间</span>
+            <input
+              type="datetime-local"
+              value={rangeInputs.end}
+              min={toDateTimeInput(historyRange?.oldest)}
+              max={toDateTimeInput(historyRange?.latest)}
+              onChange={(event) => setRangeInputs((value) => ({ ...value, end: event.target.value }))}
+              className="rounded border border-dark-600 bg-dark-700 px-3 py-2 text-sm text-gray-200"
+            />
+          </label>
+          <button type="submit" className="rounded bg-yellow-600 px-4 py-2 text-sm text-white hover:bg-yellow-500">
+            应用区间
+          </button>
+          <button type="button" onClick={resetFullHistory} className="rounded bg-dark-600 px-4 py-2 text-sm text-gray-200 hover:bg-dark-500">
+            全部历史
+          </button>
+          {rangeError && <span className="pb-2 text-xs text-red-400">{rangeError}</span>}
+        </form>
         <ResponsiveContainer width="100%" height={400}>
           <AreaChart data={chartData}>
             <defs>
@@ -195,6 +296,8 @@ export default function Dashboard() {
               fill="#171722"
               travellerWidth={12}
               tickFormatter={formatHistoryTimestamp}
+              startIndex={brushRange.startIndex}
+              endIndex={brushRange.endIndex}
               onChange={handleBrushChange}
             />
           </LineChart>
