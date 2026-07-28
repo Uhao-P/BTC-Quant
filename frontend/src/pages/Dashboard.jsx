@@ -3,11 +3,17 @@ import axios from 'axios';
 import { XAxis, YAxis, Tooltip, ResponsiveContainer, Area, AreaChart, Brush, Line, LineChart } from 'recharts';
 import AssetSelector from '../components/AssetSelector';
 import { formatHistoryTimestamp, formatUpdatedAt } from '../utils/dashboardFormat';
-import { clampBrushRange, findBrushIndexes, toDateTimeInput } from '../utils/historyRange';
+import { clampBrushRange, coversFullRange, findBrushIndexes, getPresetRange, toDateTimeInput } from '../utils/historyRange';
 
 const DASHBOARD_TIMEFRAME = '1m';
 const REFRESH_INTERVAL_MS = 10000;
 const HISTORY_REFRESH_INTERVAL_MS = 60000;
+const RANGE_PRESETS = [
+  { label: '最近一天', days: 1 },
+  { label: '最近一周', days: 7 },
+  { label: '最近一个月', days: 30 },
+  { label: '最近一年', days: 365 },
+];
 
 function mergeLatestPoint(points, candle) {
   if (!candle) return points;
@@ -190,6 +196,24 @@ export default function Dashboard() {
     await loadDetailRange(selection);
   };
 
+  const applyPresetRange = async (days) => {
+    if (!historyRange?.latest || !overviewData.length) return;
+    const preset = getPresetRange(historyRange.latest, days);
+    const oldest = toDateTimeInput(historyRange.oldest);
+    const inputs = {
+      start: preset.start < oldest ? oldest : preset.start,
+      end: preset.end,
+    };
+    if (coversFullRange(inputs, historyRange.oldest, historyRange.latest)) {
+      resetFullHistory();
+      return;
+    }
+    setRangeInputs(inputs);
+    const selection = { start: `${inputs.start}:00`, end: `${inputs.end}:00` };
+    setBrushRange(findBrushIndexes(overviewData, selection.start, selection.end));
+    await loadDetailRange(selection);
+  };
+
   if (loading) return <div className="text-gray-400">加载中...</div>;
   if (error) return <div className="text-red-400">无法连接后端: {error}</div>;
 
@@ -261,6 +285,16 @@ export default function Dashboard() {
           <button type="button" onClick={resetFullHistory} className="rounded bg-dark-600 px-4 py-2 text-sm text-gray-200 hover:bg-dark-500">
             全部历史
           </button>
+          {RANGE_PRESETS.map((preset) => (
+            <button
+              key={preset.days}
+              type="button"
+              onClick={() => applyPresetRange(preset.days)}
+              className="rounded bg-dark-600 px-4 py-2 text-sm text-gray-200 hover:bg-dark-500"
+            >
+              {preset.label}
+            </button>
+          ))}
           {rangeError && <span className="pb-2 text-xs text-red-400">{rangeError}</span>}
         </form>
         <ResponsiveContainer width="100%" height={400}>
