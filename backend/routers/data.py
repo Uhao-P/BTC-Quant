@@ -58,6 +58,31 @@ async def get_klines(
     }
 
 
+@router.get("/price-history")
+async def get_price_history(
+    symbol: str = Query("BTC-USDT-SWAP"),
+    max_points: int = Query(2500, ge=100, le=5000),
+    start: datetime = Query(None),
+    end: datetime = Query(None),
+):
+    """获取覆盖全部本地分钟线历史的有界价格概览。"""
+    overview = store.get_price_history_overview(
+        symbol, max_points=max_points, start=start, end=end
+    )
+    return {
+        "symbol": symbol,
+        "source_count": overview["source_count"],
+        "count": len(overview["data"]),
+        "oldest": overview["oldest"].isoformat() if overview["oldest"] else None,
+        "latest": overview["latest"].isoformat() if overview["latest"] else None,
+        "bucket_seconds": overview["bucket_seconds"],
+        "data": [
+            {"timestamp": point.timestamp.isoformat(), "close": point.close}
+            for point in overview["data"]
+        ],
+    }
+
+
 @router.get("/funding")
 async def get_funding(
     symbol: str = Query("BTC-USDT-SWAP"),

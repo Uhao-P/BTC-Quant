@@ -11,6 +11,7 @@ from data.store.store import store
 
 class BinanceCollector:
     REST_BASE = "https://fapi.binance.com"
+    RETRY_DELAYS = (0.5, 1.0, 2.0, 4.0)
 
     def __init__(self, proxy: Optional[str] = settings.OKX_PROXY):
         self.proxy = proxy
@@ -29,9 +30,16 @@ class BinanceCollector:
         return self._http_client
 
     async def _get(self, path: str, params: dict = None):
-        response = await self._client().get(f"{self.REST_BASE}{path}", params=params)
-        response.raise_for_status()
-        return response.json()
+        for attempt in range(len(self.RETRY_DELAYS) + 1):
+            try:
+                response = await self._client().get(f"{self.REST_BASE}{path}", params=params)
+                response.raise_for_status()
+                return response.json()
+            except httpx.HTTPError:
+                if attempt == len(self.RETRY_DELAYS):
+                    raise
+                await self.close()
+                await asyncio.sleep(self.RETRY_DELAYS[attempt])
 
     async def close(self):
         if self._http_client is not None:

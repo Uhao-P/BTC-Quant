@@ -26,9 +26,8 @@ class CollectorScheduler:
         for symbol in settings.SYMBOLS:
             for tf in settings.COLLECTION_TIMEFRAMES:
                 try:
-                    existing = len(store.get_klines(symbol, tf, limit=150))
-                    fetch_limit = max(5, 150 - existing)
-                    rows = await self.collector.fetch_historical_klines(symbol, tf, limit=fetch_limit)
+                    # Re-read a rolling window so temporary lock/network failures heal gaps.
+                    rows = await self.collector.fetch_historical_klines(symbol, tf, limit=150)
                     with store.get_session() as session:
                         new = store.save_klines_batch(session, rows)
                         session.commit()

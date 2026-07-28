@@ -111,3 +111,43 @@ def test_signal_save_updates_same_strategy_candle_instead_of_duplicating(tmp_pat
     signals = store.get_signals("BTC-USDT-SWAP")
     assert len(signals) == 1
     assert signals[0].strength == 0.8
+
+
+def test_price_history_overview_spans_all_data_with_bounded_points(tmp_path):
+    store = DataStore(f"sqlite:///{tmp_path / 'overview.db'}")
+    start = datetime(2020, 1, 1, 0, 0)
+    rows = [
+        {
+            "symbol": "BTC-USDT-SWAP",
+            "timeframe": "1m",
+            "timestamp": start + timedelta(minutes=index),
+            "open": 100.0 + index,
+            "high": 101.0 + index,
+            "low": 99.0 + index,
+            "close": 100.5 + index,
+            "volume": 10.0,
+        }
+        for index in range(10)
+    ]
+    with store.get_session() as session:
+        store.save_klines_batch(session, rows)
+        session.commit()
+
+    overview = store.get_price_history_overview("BTC-USDT-SWAP", max_points=4)
+
+    assert overview["source_count"] == 10
+    assert overview["oldest"] == start
+    assert overview["latest"] == start + timedelta(minutes=9)
+    assert len(overview["data"]) <= 4
+    assert overview["data"][0].timestamp == start
+    assert overview["data"][-1].timestamp == start + timedelta(minutes=9)
+
+    detail = store.get_price_history_overview(
+        "BTC-USDT-SWAP",
+        max_points=100,
+        start=start + timedelta(minutes=2),
+        end=start + timedelta(minutes=5),
+    )
+    assert [point.timestamp for point in detail["data"]] == [
+        start + timedelta(minutes=index) for index in range(2, 6)
+    ]

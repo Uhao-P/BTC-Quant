@@ -3,7 +3,9 @@
 """
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
+from math import ceil
 from typing import Optional
+from sqlalchemy import func, text
 from sqlalchemy.orm import Session as DBSession
 
 from data.schema.models import (
@@ -33,6 +35,12 @@ class AggregatedKline:
     close: float
     volume: float
     quote_volume: Optional[float] = None
+
+
+@dataclass(frozen=True)
+class PricePoint:
+    timestamp: datetime
+    close: float
 
 
 class DataStore:
@@ -158,6 +166,123 @@ class DataStore:
                 Kline.timeframe == timeframe,
             ).order_by(Kline.timestamp.asc()).first()
             return row[0] if row else None
+
+    def get_price_history_overview(self, symbol: str, max_points: int = 2500,
+                                   start: datetime = None,
+                                   end: datetime = None) -> dict:
+        """Return indexed samples for a range; narrow ranges retain every minute."""
+        max_points = max(2, max_points)
+        with self.get_session() as session:
+            query = session.query(
+                func.count(Kline.id),
+                func.min(Kline.timestamp),
+                func.max(Kline.timestamp),
+            ).filter(
+                Kline.symbol == symbol,
+                Kline.timeframe == "1m",
+            )
+            if start:
+                query = query.filter(Kline.timestamp >= start)
+            if end:
+                query = query.filter(Kline.timestamp <= end)
+            bounds = query.one()
+            source_count, oldest, latest = bounds
+            if not source_count:
+                return {
+                    "source_count": 0,
+                    "oldest": None,
+                    "latest": None,
+                    "bucket_seconds": 60,
+                    "data": [],
+                }
+
+            if source_count <= max_points:
+                rows_query = session.query(Kline).filter(
+                    Kline.symbol == symbol,
+                    Kline.timeframe == "1m",
+                )
+                if start:
+                    rows_query = rows_query.filter(Kline.timestamp >= start)
+                if end:
+                    rows_query = rows_query.filter(Kline.timestamp <= end)
+                rows = rows_query.order_by(Kline.timestamp.asc()).all()
+                data = [PricePoint(timestamp=row.timestamp, close=row.close) for row in rows]
+                return {
+                    "source_count": source_count,
+                    "oldest": oldest,
+                    "latest": latest,
+                    "bucket_seconds": 60,
+                    "data": data,
+                }
+
+            span_seconds = max(60, int((latest - oldest).total_seconds()))
+            bucket_seconds = max(60, ceil(span_seconds / (max_points - 1) / 60) * 60)
+            sampled = session.execute(text("""
+                WITH digits(n) AS (
+                    VALUES (0),(1),(2),(3),(4),(5),(6),(7),(8),(9)
+                ), numbers(n) AS (
+                    SELECT a.n + 10*b.n + 100*c.n + 1000*d.n
+                    FROM digits a CROSS JOIN digits b CROSS JOIN digits c CROSS JOIN digits d
+                ), targets(epoch) AS (
+                    SELECT :start_epoch + n * :bucket
+                    FROM numbers
+                    WHERE n < :steps AND :start_epoch + n * :bucket < :end_epoch
+                    UNION ALL SELECT :end_epoch
+                )
+                SELECT k.timestamp, k.close, k.volume, k.quote_volume
+                FROM targets t
+                JOIN klines k
+                  ON k.id = (
+                    SELECT candidate.id
+                    FROM klines candidate
+                    WHERE candidate.symbol = :symbol
+                      AND candidate.timeframe = '1m'
+                      AND candidate.timestamp >= datetime(t.epoch, 'unixepoch')
+                      AND candidate.timestamp <= :latest
+                    ORDER BY candidate.timestamp ASC
+                    LIMIT 1
+                  )
+                ORDER BY k.timestamp ASC
+            """), {
+                "symbol": symbol,
+                "bucket": bucket_seconds,
+                "steps": max_points - 1,
+                "start_epoch": int(oldest.replace(tzinfo=timezone.utc).timestamp()),
+                "end_epoch": int(latest.replace(tzinfo=timezone.utc).timestamp()),
+                "latest": latest,
+            }).all()
+            by_timestamp = {}
+            for row in sampled:
+                timestamp = (row.timestamp if isinstance(row.timestamp, datetime)
+                             else datetime.fromisoformat(row.timestamp))
+                by_timestamp[timestamp] = PricePoint(timestamp=timestamp, close=row.close)
+            endpoint_rows = session.query(Kline).filter(
+                Kline.symbol == symbol,
+                Kline.timeframe == "1m",
+                Kline.timestamp.in_([oldest, latest]),
+            ).all()
+            for row in endpoint_rows:
+                by_timestamp[row.timestamp] = PricePoint(
+                    timestamp=row.timestamp, close=row.close
+                )
+            data = [by_timestamp[key] for key in sorted(by_timestamp)]
+            if len(data) > max_points:
+                interior = data[1:-1]
+                slots = max_points - 2
+                indexes = {
+                    round(index * (len(interior) - 1) / max(slots - 1, 1))
+                    for index in range(slots)
+                }
+                data = [data[0]] + [
+                    point for index, point in enumerate(interior) if index in indexes
+                ][:slots] + [data[-1]]
+            return {
+                "source_count": source_count,
+                "oldest": oldest,
+                "latest": latest,
+                "bucket_seconds": bucket_seconds,
+                "data": data,
+            }
 
     def delete_derived_klines(self) -> int:
         """Remove legacy materialized candles; every higher interval is derived from 1m."""

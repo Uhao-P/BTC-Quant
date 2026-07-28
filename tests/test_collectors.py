@@ -1,7 +1,9 @@
+import asyncio
 import unittest
 from datetime import datetime
 from tempfile import TemporaryDirectory
 from unittest.mock import patch
+import httpx
 
 from data.collectors import create_collector
 from data.collectors.binance_collector import BinanceCollector
@@ -72,6 +74,33 @@ class BinanceCollectorTests(unittest.IsolatedAsyncioTestCase):
 
             self.assertEqual(result["stored"], 2)
             self.assertEqual(result["oldest"], datetime(2026, 1, 1, 0, 0))
+
+    async def test_transient_exchange_errors_are_retried(self):
+        collector = BinanceCollector()
+        collector.RETRY_DELAYS = (0,)
+        attempts = 0
+
+        class Response:
+            def raise_for_status(self):
+                return None
+
+            def json(self):
+                return {"ok": True}
+
+        class Client:
+            async def get(self, *args, **kwargs):
+                nonlocal attempts
+                attempts += 1
+                if attempts == 1:
+                    raise httpx.RemoteProtocolError("temporary disconnect")
+                return Response()
+
+        client = Client()
+        collector._client = lambda: client
+        collector.close = lambda: asyncio.sleep(0)
+
+        assert await collector._get("/test") == {"ok": True}
+        self.assertEqual(attempts, 2)
 
 
 if __name__ == "__main__":
