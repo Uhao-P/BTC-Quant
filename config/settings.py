@@ -13,6 +13,7 @@ class Settings(BaseSettings):
     OKX_SECRET_KEY: str = ""
     OKX_PASSPHRASE: str = ""
     OKX_PROXY: Optional[str] = None  # e.g. "http://127.0.0.1:7890"
+    MARKET_DATA_PROVIDER: str = "okx"
 
     # --- Data ---
     SYMBOLS: list[str] = ["BTC-USDT-SWAP", "ETH-USDT-SWAP", "DOGE-USDT-SWAP"]

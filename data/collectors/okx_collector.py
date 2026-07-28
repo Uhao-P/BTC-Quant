@@ -16,7 +16,7 @@ from data.schema.models import Kline, FundingRate
 class OKXCollector:
     """OKX 永续合约数据采集器"""
 
-    REST_BASE = "https://www.okx.com"
+    REST_BASE = "https://openapi.okx.com"
     WS_BASE = "wss://ws.okx.com:8443/ws/v5/public"
 
     def __init__(self, proxy: Optional[str] = settings.OKX_PROXY):

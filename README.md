@@ -47,6 +47,13 @@ docker compose up -d --build
 
 启动完成后访问 [http://127.0.0.1:3000](http://127.0.0.1:3000)，API 位于 `http://127.0.0.1:8700`。SQLite 数据保存在 Docker 命名卷 `btc-quant_btc_quant_data` 中，重建容器不会丢失。
 
+Docker 默认使用 Binance USD-M 永续公共行情，以便在部分网络无法连接 OKX 时仍可正常运行。三个标的会统一映射到项目的 `*-USDT-SWAP` 命名。需要切换回 OKX 时：
+
+```bash
+export MARKET_DATA_PROVIDER=okx
+docker compose up -d
+```
+
 如果当前网络访问 OKX 需要本机代理，请先设置容器可访问的代理地址（不要在容器中使用 `127.0.0.1`）：
 
 ```bash

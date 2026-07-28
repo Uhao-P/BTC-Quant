@@ -6,7 +6,7 @@ import time
 from datetime import datetime
 
 from config.settings import settings
-from data.collectors.okx_collector import OKXCollector
+from data.collectors import create_collector
 from data.store.store import store
 
 
@@ -14,7 +14,7 @@ class CollectorScheduler:
     """定时采集调度器"""
 
     def __init__(self):
-        self.collector = OKXCollector()
+        self.collector = create_collector(settings.MARKET_DATA_PROVIDER)
         self._running = False
 
     async def run_once(self):
@@ -23,9 +23,9 @@ class CollectorScheduler:
         for symbol in settings.SYMBOLS:
             for tf in settings.COLLECTION_TIMEFRAMES:
                 try:
-                    rows = await self.collector.fetch_historical_klines(
-                        symbol, tf, limit=5
-                    )
+                    existing = len(store.get_klines(symbol, tf, limit=150))
+                    fetch_limit = max(5, 150 - existing)
+                    rows = await self.collector.fetch_historical_klines(symbol, tf, limit=fetch_limit)
                     with store.get_session() as session:
                         new = store.save_klines_batch(session, rows)
                         session.commit()

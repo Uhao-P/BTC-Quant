@@ -4,7 +4,8 @@ BTC 历史数据回填脚本
 import asyncio
 import argparse
 
-from data.collectors.okx_collector import OKXCollector
+from config.settings import settings
+from data.collectors import create_collector
 
 
 async def main():
@@ -14,7 +15,7 @@ async def main():
     parser.add_argument("--symbol", default="BTC-USDT-SWAP")
     args = parser.parse_args()
 
-    c = OKXCollector()
+    c = create_collector(settings.MARKET_DATA_PROVIDER)
     print(f"Backfilling {args.bars} bars of {args.timeframe} for {args.symbol}...")
     await c.backfill_klines(args.symbol, args.timeframe, args.bars)
     print("Done.")
