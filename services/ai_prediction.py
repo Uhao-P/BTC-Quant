@@ -142,7 +142,6 @@ class LLMClient:
             body = {
                 "model": settings.LLM_MODEL,
                 "messages": [{"role": "user", "content": prompt}],
-                "response_format": {"type": "json_object"},
             }
         else:
             url = f"{base_url}/responses"

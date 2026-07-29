@@ -1,12 +1,14 @@
 import json
 
 import pytest
+import httpx
 
 from services.ai_prediction import (
     AIPredictionService,
     build_prediction_prompt,
     parse_llm_response,
     parse_news_rss,
+    LLMClient,
 )
 
 
@@ -80,3 +82,29 @@ async def test_analyze_context_sends_the_exact_reviewed_prompt():
 
     assert llm.prompt == "reviewed prompt"
     assert result["analysis"]["direction"] == "neutral"
+
+
+@pytest.mark.asyncio
+async def test_chat_completions_request_matches_litellm_contract(monkeypatch):
+    from config.settings import settings
+
+    captured = {}
+
+    async def fake_post(_self, url, headers, json):
+        captured.update(url=url, headers=headers, body=json)
+        return httpx.Response(200, json={"choices": [{"message": {"content": '{"direction":"neutral","confidence":50}'}}]}, request=httpx.Request("POST", url))
+
+    monkeypatch.setattr(settings, "LLM_API_KEY", "test-key")
+    monkeypatch.setattr(settings, "LLM_BASE_URL", "https://litellm.example/v1")
+    monkeypatch.setattr(settings, "LLM_MODEL", "xiaosuan-8")
+    monkeypatch.setattr(settings, "LLM_API_STYLE", "chat_completions")
+    monkeypatch.setattr(httpx.AsyncClient, "post", fake_post)
+
+    await LLMClient().analyze("你是谁")
+
+    assert captured["url"] == "https://litellm.example/v1/chat/completions"
+    assert captured["body"] == {
+        "model": "xiaosuan-8",
+        "messages": [{"role": "user", "content": "你是谁"}],
+    }
+    assert captured["headers"]["Authorization"] == "Bearer test-key"
